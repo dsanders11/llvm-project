@@ -594,6 +594,15 @@ ParsedAST::build(llvm::StringRef Filename, const ParseInputs &Inputs,
       Diags->insert(Diags->end(), D.begin(), D.end());
     }
   }
+  auto BuildDir = VFS->getCurrentWorkingDirectory();
+  auto Style = getFormatStyleForFile(Filename, Inputs.Contents, *Inputs.TFS);
+  auto Inserter = std::make_shared<IncludeInserter>(
+      Filename, Inputs.Contents, Style, BuildDir.get(),
+      &Clang->getPreprocessor().getHeaderSearchInfo());
+  if (Preamble) {
+    for (const auto &Inc : Preamble->Includes.MainFileIncludes)
+      Inserter->addExisting(Inc);
+  }
   ParsedAST Result(Inputs.Version, std::move(Preamble), std::move(Clang),
                    std::move(Action), std::move(Tokens), std::move(Macros),
                    std::move(Marks), std::move(ParsedDecls), std::move(Diags),
@@ -604,6 +613,11 @@ ParsedAST::build(llvm::StringRef Filename, const ParseInputs &Inputs,
     Result.Diags->insert(Result.Diags->end(),
                          make_move_iterator(UnusedHeadersDiags.begin()),
                          make_move_iterator(UnusedHeadersDiags.end()));
+    auto NeededHeadersDiags =
+        issueNeededIncludesDiagnostics(Result, Inserter, Inputs.Contents);
+    Result.Diags->insert(Result.Diags->end(),
+                         make_move_iterator(NeededHeadersDiags.begin()),
+                         make_move_iterator(NeededHeadersDiags.end()));
   }
   return Result;
 }

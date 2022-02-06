@@ -125,6 +125,9 @@ private:
       if (auto Values = scalarValues(N))
         F.Suppress = std::move(*Values);
     });
+    Dict.handle("NeededIncludes", [&](Node &N) {
+      F.NeededIncludes = scalarValue(N, "NeededIncludes");
+    });
     Dict.handle("UnusedIncludes", [&](Node &N) {
       F.UnusedIncludes = scalarValue(N, "UnusedIncludes");
     });

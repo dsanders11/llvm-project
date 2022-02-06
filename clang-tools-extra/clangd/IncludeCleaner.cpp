@@ -12,6 +12,7 @@
 #include "ParsedAST.h"
 #include "Protocol.h"
 #include "SourceCode.h"
+#include "URI.h"
 #include "support/Logger.h"
 #include "support/Trace.h"
 #include "clang/AST/ASTContext.h"
@@ -365,6 +366,30 @@ getUnused(ParsedAST &AST,
   return Unused;
 }
 
+std::vector<std::string>
+getNeeded(ParsedAST &AST,
+          const llvm::DenseSet<IncludeStructure::HeaderID> &ReferencedFiles) {
+  trace::Span Tracer("IncludeCleaner::getNeeded");
+  auto Includes = AST.getIncludeStructure();
+  llvm::DenseSet<IncludeStructure::HeaderID> CurrentIncludes;
+  for (const Inclusion &MFI : Includes.MainFileIncludes) {
+    if (!MFI.HeaderID)
+      continue;
+    auto IncludeID = static_cast<IncludeStructure::HeaderID>(*MFI.HeaderID);
+    CurrentIncludes.insert(IncludeID);
+  }
+  std::vector<std::string> NeededIncludes;
+  for (auto IncludeID : ReferencedFiles) {
+    if (IncludeID != Includes.MainFileID &&
+        Includes.isSelfContained(IncludeID)) {
+      bool Needed = !CurrentIncludes.contains(IncludeID);
+      if (Needed)
+        NeededIncludes.push_back(std::string(Includes.getRealPath(IncludeID)));
+    }
+  }
+  return NeededIncludes;
+}
+
 #ifndef NDEBUG
 // Is FID a <built-in>, <scratch space> etc?
 static bool isSpecialBuffer(FileID FID, const SourceManager &SM) {
@@ -407,6 +432,17 @@ std::vector<const Inclusion *> computeUnusedIncludes(ParsedAST &AST) {
   return getUnused(AST, ReferencedHeaders);
 }
 
+std::vector<std::string> computeNeededIncludes(ParsedAST &AST) {
+  const auto &SM = AST.getSourceManager();
+
+  auto Refs = findReferencedLocations(AST);
+  auto ReferencedFileIDs = findReferencedFiles(Refs, AST.getIncludeStructure(),
+                                               AST.getSourceManager());
+  auto ReferencedHeaders =
+      translateToHeaderIDs(ReferencedFileIDs, AST.getIncludeStructure(), SM);
+  return getNeeded(AST, ReferencedHeaders);
+}
+
 std::vector<Diag> issueUnusedIncludesDiagnostics(ParsedAST &AST,
                                                  llvm::StringRef Code) {
   const Config &Cfg = Config::current();
@@ -446,6 +482,47 @@ std::vector<Diag> issueUnusedIncludesDiagnostics(ParsedAST &AST,
     D.Fixes.back().Edits.back().range.end.line = Inc->HashLine + 1;
     D.InsideMainFile = true;
     Result.push_back(std::move(D));
+  }
+  return Result;
+}
+
+std::vector<Diag>
+issueNeededIncludesDiagnostics(ParsedAST &AST,
+                               std::shared_ptr<IncludeInserter> Inserter,
+                               llvm::StringRef Code) {
+  const Config &Cfg = Config::current();
+  if (Cfg.Diagnostics.NeededIncludes != Config::NeededIncludesPolicy::Strict ||
+      Cfg.Diagnostics.SuppressAll ||
+      Cfg.Diagnostics.Suppress.contains("needed-includes"))
+    return {};
+  trace::Span Tracer("IncludeCleaner::issueNeededIncludesDiagnostics");
+  std::vector<Diag> Result;
+  std::string FileName =
+      AST.getSourceManager()
+          .getFileEntryForID(AST.getSourceManager().getMainFileID())
+          ->getName()
+          .str();
+  for (const auto &Inc : computeNeededIncludes(AST)) {
+    if (auto HeaderFile =
+            toHeaderFile(URI::createFile(Inc).toString(), FileName)) {
+      if (auto Spelled =
+              Inserter->calculateIncludePath(*HeaderFile, FileName)) {
+        if (auto Edit = Inserter->insert(*Spelled)) {
+          Diag D;
+          D.Message = llvm::formatv("header {0} should be included", *Spelled);
+          D.Name = "needed-includes";
+          D.Source = Diag::DiagSource::Clangd;
+          D.File = FileName;
+          D.Severity = DiagnosticsEngine::Note;
+          D.Range = Edit->range;
+          D.Fixes.emplace_back();
+          D.Fixes.back().Message = "add #include directive";
+          D.Fixes.back().Edits.push_back(*Edit);
+          D.InsideMainFile = true;
+          Result.push_back(std::move(D));
+        }
+      }
+    }
   }
   return Result;
 }

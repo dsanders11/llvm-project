@@ -423,6 +423,16 @@ struct FragmentCompiler {
               C.Diagnostics.Suppress.insert(N);
           });
 
+    if (F.NeededIncludes)
+      if (auto Val = compileEnum<Config::NeededIncludesPolicy>(
+                         "NeededIncludes", **F.NeededIncludes)
+                         .map("Strict", Config::NeededIncludesPolicy::Strict)
+                         .map("None", Config::NeededIncludesPolicy::None)
+                         .value())
+        Out.Apply.push_back([Val](const Params &, Config &C) {
+          C.Diagnostics.NeededIncludes = *Val;
+        });
+
     if (F.UnusedIncludes)
       if (auto Val = compileEnum<Config::UnusedIncludesPolicy>(
                          "UnusedIncludes", **F.UnusedIncludes)
