@@ -232,6 +232,11 @@ struct Fragment {
     /// - None
     llvm::Optional<Located<std::string>> UnusedIncludes;
 
+    /// Valid values are:
+    /// - Strict
+    /// - None
+    llvm::Optional<Located<std::string>> NeededIncludes;
+
     /// Controls how clang-tidy will run over the code base.
     ///
     /// The settings are merged with any settings found in .clang-tidy

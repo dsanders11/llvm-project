@@ -86,7 +86,8 @@ struct Config {
     ExternalIndexSpec External;
   } Index;
 
-  enum UnusedIncludesPolicy { Strict, None };
+  enum class NeededIncludesPolicy { Strict, None };
+  enum class UnusedIncludesPolicy { Strict, None };
   /// Controls warnings and errors when parsing code.
   struct {
     bool SuppressAll = false;
@@ -99,7 +100,8 @@ struct Config {
       llvm::StringMap<std::string> CheckOptions;
     } ClangTidy;
 
-    UnusedIncludesPolicy UnusedIncludes = None;
+    NeededIncludesPolicy NeededIncludes = NeededIncludesPolicy::None;
+    UnusedIncludesPolicy UnusedIncludes = UnusedIncludesPolicy::None;
   } Diagnostics;
 
   /// Style of the codebase.
