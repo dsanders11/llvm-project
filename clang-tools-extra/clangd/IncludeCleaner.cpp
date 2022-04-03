@@ -516,7 +516,7 @@ issueNeededIncludesDiagnostics(ParsedAST &AST,
           D.Severity = DiagnosticsEngine::Note;
           D.Range = Edit->range;
           D.Fixes.emplace_back();
-          D.Fixes.back().Message = "add #include directive";
+          D.Fixes.back().Message = llvm::formatv("add #include {0}", *Spelled);
           D.Fixes.back().Edits.push_back(*Edit);
           D.InsideMainFile = true;
           Result.push_back(std::move(D));
