@@ -248,6 +248,16 @@ TEST(IncludeCleaner, ReferencedLocations) {
       {
           "struct ^X{inline int foo();}; inline int X::^foo() { return 42; }",
           "int foobar = X().foo();"
+      },
+      // Pointer dereference to base class
+      {
+          "struct ^X{}; struct ^Y: X{}; Y* ^foo(); void ^bar(X);",
+          "void baz() { bar(*foo()); }",
+      },
+      // TODO - This shouldn't mark the operator on the base class (test currently fails)
+      {
+          "struct X{X& operator++();}; struct ^Y: X{}; Y ^foo();",
+          "auto bar = ++foo();"
       }
   };
   for (const TestCase &T : Cases) {

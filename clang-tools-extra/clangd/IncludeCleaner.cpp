@@ -16,6 +16,7 @@
 #include "support/Logger.h"
 #include "support/Trace.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/ComputeDependence.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/RecursiveASTVisitor.h"
@@ -64,6 +65,14 @@ public:
           Result.User.insert(Definition->getLocation());
         }
       }
+    }
+    return true;
+  }
+
+  bool VisitExpr(Expr *E) {
+    // Using a unary operator on a type should mark that type as being used
+    if (const auto *UO = llvm::dyn_cast<UnaryOperator>(E)) {
+      TraverseType(UO->getType());
     }
     return true;
   }
