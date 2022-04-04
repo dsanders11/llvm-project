@@ -45,6 +45,11 @@ TEST(IncludeCleaner, ReferencedLocations) {
           "class ^X;",
           "X *y;",
       },
+      // Base classes
+      {
+          "class ^X {}; class X; class ^Y {};",
+          "class Z: public X, public Y {};",
+      },
       // When definition is available, we don't need to mark forward
       // declarations as used.
       {
@@ -52,10 +57,18 @@ TEST(IncludeCleaner, ReferencedLocations) {
           "X *y;",
       },
       // We already have forward declaration in the main file, the other
-      // non-definition declarations are not needed.
+      // declarations are not needed.
+      {
+          "class X {}; class X;",
+          "class X; X *y;",
+      },
       {
           "class ^X {}; class X;",
-          "class X; X *y;",
+          "X y;",
+      },
+      {
+          "class ^X {};",
+          "class X; X y;",
       },
       // Nested class definition can occur outside of the parent class
       // definition. Bar declaration should be visible to its definition but
@@ -219,6 +232,11 @@ TEST(IncludeCleaner, ReferencedLocations) {
       {
           "enum class ^Color : char {};",
           "Color *c;",
+      },
+      // Pointer dereference to base class
+      {
+          "struct ^X{}; struct ^Y: X{}; Y* ^foo(); void ^bar(X);",
+          "void baz() { bar(*foo()); }",
       },
   };
   for (const TestCase &T : Cases) {
