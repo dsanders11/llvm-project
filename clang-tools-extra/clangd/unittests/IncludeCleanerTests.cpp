@@ -45,6 +45,11 @@ TEST(IncludeCleaner, ReferencedLocations) {
           "class ^X;",
           "X *y;",
       },
+      // Base classes
+      {
+          "class ^X {}; class X; class ^Y {};",
+          "class Z: public X, public Y {};",
+      },
       // When definition is available, we don't need to mark forward
       // declarations as used.
       {
@@ -52,10 +57,18 @@ TEST(IncludeCleaner, ReferencedLocations) {
           "X *y;",
       },
       // We already have forward declaration in the main file, the other
-      // non-definition declarations are not needed.
+      // declarations are not needed.
+      {
+          "class X {}; class X;",
+          "class X; X *y;",
+      },
       {
           "class ^X {}; class X;",
-          "class X; X *y;",
+          "X y;",
+      },
+      {
+          "class ^X {};",
+          "class X; X y;",
       },
       // Nested class definition can occur outside of the parent class
       // definition. Bar declaration should be visible to its definition but
@@ -111,6 +124,10 @@ TEST(IncludeCleaner, ReferencedLocations) {
           "struct ^X{int ^a;}; X ^foo();",
           "int y = foo().a;",
       },
+      {
+          "struct X{}; X* ^foo(); void ^bar(X*);",
+          "void baz() { bar(foo()); }",
+      },
       // Expr (type is traversed)
       {
           "class ^X{}; X ^foo();",
@@ -160,11 +177,11 @@ TEST(IncludeCleaner, ReferencedLocations) {
       },
       // Enums
       {
-          "enum ^Color { ^Red = 42, Green = 9000};",
+          "enum Color { ^Red = 42, Green = 9000};",
           "int MyColor = Red;",
       },
       {
-          "struct ^X { enum ^Language { ^CXX = 42, Python = 9000}; };",
+          "struct ^X { enum Language { ^CXX = 42, Python = 9000}; };",
           "int Lang = X::CXX;",
       },
       // Macros
