@@ -101,7 +101,7 @@ TEST(IncludeCleaner, ReferencedLocations) {
       {
           // https://github.com/clangd/clangd/issues/1036
           R"cpp(
-            struct ^Base { void ^base(); };
+            struct Base { void base(); };
             template <int> struct ^Derived : Base {};
           )cpp",
           R"cpp(
@@ -121,8 +121,16 @@ TEST(IncludeCleaner, ReferencedLocations) {
       },
       // MemberExpr
       {
-          "struct ^X{int ^a;}; X ^foo();",
+          "struct ^X{int a;}; X ^foo();",
           "int y = foo().a;",
+      },
+      {
+          "struct X{int bar() const; }; struct ^Y: X{}; struct Y;",
+          "int baz = Y().bar();",
+      },
+      {
+          "struct X{int bar() const; }; struct ^Y: X{}; struct ^Z{Y* foo();};",
+          "int baz = Z().foo()->bar();",
       },
       {
           "struct X{}; X* ^foo(); void ^bar(X*);",
@@ -140,7 +148,7 @@ TEST(IncludeCleaner, ReferencedLocations) {
       },
       // Constructor
       {
-          "struct ^X { ^X(int) {} int ^foo(); };",
+          "struct ^X { ^X(int) {} int foo(); };",
           "auto x = X(42); auto y = x.foo();",
       },
       // Function
@@ -237,6 +245,10 @@ TEST(IncludeCleaner, ReferencedLocations) {
           "enum class ^Color : char {};",
           "Color *c;",
       },
+      {
+          "struct ^X{inline int foo();}; inline int X::^foo() { return 42; }",
+          "int foobar = X().foo();"
+      }
   };
   for (const TestCase &T : Cases) {
     TestTU TU;

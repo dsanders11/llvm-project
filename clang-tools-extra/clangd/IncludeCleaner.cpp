@@ -16,6 +16,7 @@
 #include "support/Logger.h"
 #include "support/Trace.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Basic/SourceLocation.h"
@@ -51,9 +52,19 @@ public:
   }
 
   bool VisitMemberExpr(MemberExpr *ME) {
-    TraverseType(ME->getBase()->getType());
-    add(ME->getMemberDecl());
-    add(ME->getFoundDecl().getDecl());
+    if (auto *RD = ME->getBase()->getBestDynamicClassType()) {
+      add(RD);
+    } else {
+      TraverseType(ME->getBase()->getType());
+    }
+    // If an out-of-line method definition is visible, mark it as used
+    if (const auto *MD = llvm::dyn_cast<CXXMethodDecl>(ME->getMemberDecl())) {
+      if (const auto *Definition = MD->getDefinition()) {
+        if (Definition->isOutOfLine()) {
+          Result.User.insert(Definition->getLocation());
+        }
+      }
+    }
     return true;
   }
 
