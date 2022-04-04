@@ -138,18 +138,19 @@ private:
     }
     // Special case RecordDecls, as it is common for them to be forward
     // declared multiple times. The most common cases are:
+    // - There's a forward declaration in the main file, no need for other
+    //   redecls.
     // - Definition available in TU, only mark that one as usage. The rest is
     //   likely to be unnecessary. This might result in false positives when an
     //   internal definition is visible.
-    // - There's a forward declaration in the main file, no need for other
-    //   redecls.
     if (const auto *RD = llvm::dyn_cast<RecordDecl>(D)) {
+      if (SM.isInMainFile(RD->getMostRecentDecl()->getLocation())) {
+        return;
+      }
       if (const auto *Definition = RD->getDefinition()) {
         Result.User.insert(Definition->getLocation());
         return;
       }
-      if (SM.isInMainFile(RD->getMostRecentDecl()->getLocation()))
-        return;
     }
     for (const Decl *Redecl : D->redecls())
       Result.User.insert(Redecl->getLocation());
