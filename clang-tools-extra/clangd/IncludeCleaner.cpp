@@ -144,8 +144,16 @@ private:
         return;
       }
     }
-    for (const Decl *Redecl : D->redecls())
+    for (const Decl *Redecl : D->redecls()) {
+      // Special case TemplateDecls and only consider the canonical location.
+      // TODO - This doesn't play nicely with situations where you only need a
+      //        forward declaration and there's a special forward declaration header
+      if (const auto *TD = llvm::dyn_cast<TemplateDecl>(Redecl)) {
+        if (!TD->isCanonicalDecl())
+          continue;
+      }
       Result.User.insert(Redecl->getLocation());
+    }
   }
 
   bool isNew(const void *P) { return P && Visited.insert(P).second; }
