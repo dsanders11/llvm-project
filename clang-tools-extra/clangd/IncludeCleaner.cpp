@@ -51,6 +51,7 @@ public:
   }
 
   bool VisitMemberExpr(MemberExpr *ME) {
+    TraverseType(ME->getBase()->getType());
     add(ME->getMemberDecl());
     add(ME->getFoundDecl().getDecl());
     return true;
@@ -86,15 +87,6 @@ public:
 
   bool VisitTypedefType(TypedefType *TT) {
     add(TT->getDecl());
-    return true;
-  }
-
-  // Consider types of any subexpression used, even if the type is not named.
-  // This is helpful in getFoo().bar(), where Foo must be complete.
-  // FIXME(kirillbobyrev): Should we tweak this? It may not be desirable to
-  // consider types "used" when they are not directly spelled in code.
-  bool VisitExpr(Expr *E) {
-    TraverseType(E->getType());
     return true;
   }
 
