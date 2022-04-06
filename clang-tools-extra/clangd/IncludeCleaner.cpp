@@ -18,6 +18,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/RecursiveASTVisitor.h"
+#include "clang/AST/Type.h"
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/Lex/HeaderSearch.h"
@@ -149,6 +150,13 @@ private:
       }
       if (const auto *Definition = RD->getDefinition()) {
         Result.User.insert(Definition->getLocation());
+        return;
+      }
+    }
+    // Special case EnumDecls as well for forward declarations
+    if (const auto *ED = llvm::dyn_cast<EnumDecl>(D)) {
+      const auto *MRD = ED->getMostRecentDecl();
+      if (!MRD->isCompleteDefinition() && SM.isInMainFile(MRD->getLocation())) {
         return;
       }
     }

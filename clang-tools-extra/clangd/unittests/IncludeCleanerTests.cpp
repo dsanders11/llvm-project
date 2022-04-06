@@ -180,6 +180,10 @@ TEST(IncludeCleaner, ReferencedLocations) {
           "struct ^X { enum ^Language { ^CXX = 42, Python = 9000}; };",
           "int Lang = X::CXX;",
       },
+      {
+          "enum class Color { Red = 42, Green = 9000};",
+          "enum class Color; void foo(Color);"
+      },
       // Macros
       {
           "#define ^CONSTANT 42",
