@@ -44,6 +44,7 @@ private:
   include_cleaner::RecordedPP RecordedPreprocessor;
   include_cleaner::PragmaIncludes RecordedPI;
   const Preprocessor *PP = nullptr;
+  std::vector<StringRef> OnlyHeaders;
   std::vector<StringRef> IgnoreHeaders;
   // Whether emit only one finding per usage of a symbol.
   const bool DeduplicateFindings;
@@ -51,6 +52,7 @@ private:
   const bool UnusedIncludes;
   // Whether to report missing includes.
   const bool MissingIncludes;
+  llvm::SmallVector<llvm::Regex> OnlyHeadersRegex;
   llvm::SmallVector<llvm::Regex> IgnoreHeadersRegex;
   bool shouldIgnore(const include_cleaner::Header &H);
 };

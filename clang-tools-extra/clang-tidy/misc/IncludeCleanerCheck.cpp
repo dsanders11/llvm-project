@@ -56,11 +56,22 @@ struct MissingIncludeInfo {
 IncludeCleanerCheck::IncludeCleanerCheck(StringRef Name,
                                          ClangTidyContext *Context)
     : ClangTidyCheck(Name, Context),
+      OnlyHeaders(
+          utils::options::parseStringList(Options.get("OnlyHeaders", ""))),
       IgnoreHeaders(
           utils::options::parseStringList(Options.get("IgnoreHeaders", ""))),
       DeduplicateFindings(Options.get("DeduplicateFindings", true)),
       UnusedIncludes(Options.get("UnusedIncludes", true)),
       MissingIncludes(Options.get("MissingIncludes", true)) {
+  for (const auto &Header : OnlyHeaders) {
+    if (!llvm::Regex{Header}.isValid())
+      configurationDiag("Invalid only headers regex '%0'") << Header;
+    std::string HeaderSuffix{Header.str()};
+    if (!Header.ends_with("$"))
+      HeaderSuffix += "$";
+    OnlyHeadersRegex.emplace_back(HeaderSuffix);
+  }
+
   for (const auto &Header : IgnoreHeaders) {
     if (!llvm::Regex{Header}.isValid())
       configurationDiag("Invalid ignore headers regex '%0'") << Header;
@@ -77,6 +88,8 @@ IncludeCleanerCheck::IncludeCleanerCheck(StringRef Name,
 }
 
 void IncludeCleanerCheck::storeOptions(ClangTidyOptions::OptionMap &Opts) {
+  Options.store(Opts, "OnlyHeaders",
+                utils::options::serializeStringList(OnlyHeaders));
   Options.store(Opts, "IgnoreHeaders",
                 utils::options::serializeStringList(IgnoreHeaders));
   Options.store(Opts, "DeduplicateFindings", DeduplicateFindings);
@@ -102,7 +115,7 @@ void IncludeCleanerCheck::registerPPCallbacks(const SourceManager &SM,
 }
 
 bool IncludeCleanerCheck::shouldIgnore(const include_cleaner::Header &H) {
-  return llvm::any_of(IgnoreHeadersRegex, [&H](const llvm::Regex &R) {
+  auto HeaderMatches = [&H](const llvm::Regex &R) {
     switch (H.kind()) {
     case include_cleaner::Header::Standard:
       // We don't trim angle brackets around standard library headers
@@ -115,7 +128,16 @@ bool IncludeCleanerCheck::shouldIgnore(const include_cleaner::Header &H) {
       return R.match(H.physical().getFileEntry().tryGetRealPathName());
     }
     llvm_unreachable("Unknown Header kind.");
-  });
+  };
+
+  auto OnlyMatches = llvm::any_of(OnlyHeadersRegex, HeaderMatches);
+  auto IgnoreMatches = llvm::any_of(IgnoreHeadersRegex, HeaderMatches);
+
+  if (!OnlyHeadersRegex.empty() && !OnlyMatches)
+    return true;
+  if (!IgnoreHeadersRegex.empty() && IgnoreMatches)
+    return true;
+  return false;
 }
 
 void IncludeCleanerCheck::check(const MatchFinder::MatchResult &Result) {
